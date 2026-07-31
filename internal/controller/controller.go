@@ -74,8 +74,13 @@ func (c *Controller) RenderStack() error {
 		}
 	}
 	platform["VENDRA_PROVISIONER_TOKEN"] = c.Config.ProvisionerToken
+	platform["STOREFRONT_PROVISIONER_TOKEN"] = c.Config.ProvisionerToken
+	platform["STOREFRONT_PROVISIONER_URL"] = "http://provisioner:8080/v1/storefronts"
+	platform["STOREFRONT_IMAGE"] = c.Config.Images.Storefront
 	platform["VENDRA_BASE_DOMAIN"] = c.Config.BaseDomain
 	platform["APP_URL"] = "https://" + c.Config.BaseDomain
+	platform["DB_HOST"] = "mysql"
+	platform["REDIS_HOST"] = "redis"
 	return envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "platform", "platform.env"), platform)
 }
 func (c *Controller) project(name string) compose.Project {
