@@ -98,7 +98,24 @@ func validateRequest(request api.StorefrontRequest, spec property.Spec) error {
 	if value["theme"] != request.Theme {
 		return errors.New("configuration theme does not match request")
 	}
+	requestJSON, err := json.Marshal(request.Configuration)
+	if err != nil {
+		return errors.New("configuration is invalid")
+	}
+	var requestValue map[string]any
+	if err = json.Unmarshal(requestJSON, &requestValue); err != nil {
+		return errors.New("configuration is invalid")
+	}
+	if !mapsEqual(value, requestValue) {
+		return errors.New("configuration and configuration_base64 do not match")
+	}
 	return nil
+}
+
+func mapsEqual(left, right map[string]any) bool {
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	return leftErr == nil && rightErr == nil && string(leftJSON) == string(rightJSON)
 }
 func (s *Server) fail(w http.ResponseWriter, err error) {
 	s.logger.Error("provisioning failed", "error", err)
