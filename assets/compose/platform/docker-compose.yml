@@ -1,0 +1,70 @@
+name: vendra
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?required}"
+      MYSQL_DATABASE: "${DB_DATABASE:-vendra}"
+      MYSQL_USER: "${DB_USERNAME:-vendra}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:?required}"
+    volumes: ["mysql-data:/var/lib/mysql"]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_ROOT_PASSWORD mysqladmin ping -h 127.0.0.1 -u root"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    volumes: ["redis-data:/data"]
+    networks: [internal]
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 10s, timeout: 5s, retries: 6}
+  php: &php
+    image: "${VENDRA_PLATFORM_IMAGE:?required}"
+    restart: unless-stopped
+    env_file: ["platform.env"]
+    expose: ["8080"]
+    volumes: ["storage-data:/app/storage/app"]
+    networks: [internal, traefik-public]
+    depends_on:
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.services.vendra-panels.loadbalancer.server.port=8080"
+  php-api:
+    <<: *php
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.services.vendra-api.loadbalancer.server.port=8080"
+  horizon:
+    <<: *php
+    command: ["php", "artisan", "horizon"]
+    networks: [internal]
+    labels: []
+  scheduler:
+    <<: *php
+    command: ["php", "artisan", "schedule:work"]
+    networks: [internal]
+    labels: []
+  provisioner:
+    image: "${VENDRA_PROVISIONER_IMAGE:?required}"
+    restart: unless-stopped
+    env_file: ["platform.env"]
+    environment:
+      VENDRA_STATE_DIR: /var/lib/vendra
+      VENDRA_PROVISIONER_LISTEN: :8080
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "${VENDRA_STATE_DIR:-/var/lib/vendra}:/var/lib/vendra"
+    networks: [internal]
+    healthcheck: {test: ["CMD", "/provisioner", "healthcheck"], interval: 10s, timeout: 3s, retries: 6}
+volumes: {mysql-data: {}, redis-data: {}, storage-data: {}}
+networks:
+  internal: {}
+  traefik-public: {external: true}
+

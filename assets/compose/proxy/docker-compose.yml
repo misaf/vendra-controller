@@ -1,0 +1,25 @@
+name: proxy
+services:
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    restart: unless-stopped
+    environment: {CONTAINERS: 1, NETWORKS: 1, SERVICES: 1, TASKS: 1, EVENTS: 1, POST: 0, EXEC: 0, IMAGES: 0, VOLUMES: 0}
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock:ro"]
+    networks: [socket]
+  traefik:
+    image: traefik:v3.7
+    restart: unless-stopped
+    depends_on: [socket-proxy]
+    ports: ["80:80", "443:443"]
+    environment:
+      BASE_DOMAIN: "${BASE_DOMAIN:?required}"
+      CERT_RESOLVER: "${CERT_RESOLVER:-}"
+    volumes:
+      - "./traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./dynamic:/etc/traefik/dynamic:ro"
+      - "${VENDRA_STATE_DIR:-/var/lib/vendra}/certificates:/certs:ro"
+      - "${VENDRA_STATE_DIR:-/var/lib/vendra}/acme:/acme"
+    networks: [traefik-public, socket]
+networks:
+  traefik-public: {external: true}
+  socket: {internal: true}

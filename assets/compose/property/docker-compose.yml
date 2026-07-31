@@ -1,0 +1,32 @@
+name: "${ROUTER_NAME}"
+services:
+  web:
+    image: "${STOREFRONT_IMAGE}"
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    expose: ["${STOREFRONT_PORT:-3000}"]
+    environment:
+      NODE_ENV: production
+      STOREFRONT_CONFIG_BASE64: "${STOREFRONT_CONFIG_BASE64:?required}"
+      VENDRA_API_URL: "https://api.${BASE_DOMAIN}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${STOREFRONT_PORT:-3000}${STOREFRONT_HEALTH_PATH:-/}').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    networks: [traefik-public]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.services.${ROUTER_NAME}.loadbalancer.server.port=${STOREFRONT_PORT:-3000}"
+      - "traefik.http.routers.${ROUTER_NAME}.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
+      - "traefik.http.routers.${ROUTER_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.${ROUTER_NAME}.tls=true"
+      - "traefik.http.routers.${ROUTER_NAME}.tls.certresolver=${CERT_RESOLVER:-}"
+networks:
+  traefik-public: {external: true}
+

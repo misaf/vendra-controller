@@ -1,0 +1,13 @@
+api: {dashboard: true}
+ping: {}
+entryPoints:
+  web: {address: ":80"}
+  websecure: {address: ":443"}
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false
+    network: traefik-public
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
