@@ -26,6 +26,7 @@ type Config struct {
 	HealthTimeout    time.Duration `yaml:"-"`
 	HealthTimeoutRaw string        `yaml:"health_timeout"`
 	CertificateMode  string        `yaml:"certificate_mode"`
+	ACMEEmail        string        `yaml:"acme_email"`
 	Images           Images        `yaml:"images"`
 	ProvisionerToken string        `yaml:"-"`
 }
@@ -59,6 +60,7 @@ func Load(path string) (Config, error) {
 	override(&cfg.Network, "VENDRA_NETWORK")
 	override(&cfg.Listen, "VENDRA_PROVISIONER_LISTEN")
 	override(&cfg.CertificateMode, "VENDRA_CERTIFICATE_MODE")
+	override(&cfg.ACMEEmail, "VENDRA_ACME_EMAIL")
 	override(&cfg.Images.Platform, "VENDRA_PLATFORM_IMAGE")
 	override(&cfg.Images.Website, "VENDRA_WEBSITE_IMAGE")
 	override(&cfg.Images.Storefront, "VENDRA_STOREFRONT_IMAGE")
@@ -112,6 +114,9 @@ func (c Config) Validate() error {
 	}
 	if c.CertificateMode != "self-signed" && c.CertificateMode != "acme" {
 		return errors.New("certificate_mode must be self-signed or acme")
+	}
+	if c.CertificateMode == "acme" && strings.TrimSpace(c.ACMEEmail) == "" {
+		return errors.New("acme_email is required in acme certificate mode")
 	}
 	return nil
 }

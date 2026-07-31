@@ -4,9 +4,9 @@ network: traefik-public
 listen: :8080
 health_timeout: 2m
 certificate_mode: acme
+acme_email: ops@example.com
 images:
   platform: ghcr.io/misaf/vendra@sha256:REPLACE
   website: ghcr.io/misaf/vendra-website@sha256:REPLACE
   storefront: ghcr.io/misaf/vendra-storefront-florist@sha256:REPLACE
   provisioner: ghcr.io/misaf/vendra-controller-provisioner@sha256:REPLACE
-

@@ -38,6 +38,12 @@ func (c *Controller) Init() error {
 			return err
 		}
 	}
+	acmePath := filepath.Join(c.Config.StateDir, "acme", "acme.json")
+	if _, err := os.Stat(acmePath); os.IsNotExist(err) {
+		if err := os.WriteFile(acmePath, []byte("{}"), 0o600); err != nil {
+			return err
+		}
+	}
 	return c.RenderStack()
 }
 func (c *Controller) RenderStack() error {
@@ -46,7 +52,12 @@ func (c *Controller) RenderStack() error {
 			return err
 		}
 	}
-	values := map[string]string{"BASE_DOMAIN": c.Config.BaseDomain, "VENDRA_STATE_DIR": c.Config.StateDir, "VENDRA_PLATFORM_IMAGE": c.Config.Images.Platform, "VENDRA_WEBSITE_IMAGE": c.Config.Images.Website, "VENDRA_PROVISIONER_IMAGE": c.Config.Images.Provisioner}
+	values := map[string]string{"BASE_DOMAIN": c.Config.BaseDomain, "VENDRA_STATE_DIR": c.Config.StateDir, "VENDRA_PLATFORM_IMAGE": c.Config.Images.Platform, "VENDRA_WEBSITE_IMAGE": c.Config.Images.Website, "VENDRA_PROVISIONER_IMAGE": c.Config.Images.Provisioner, "ACME_EMAIL": c.Config.ACMEEmail}
+	for _, key := range []string{"DB_DATABASE", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD"} {
+		if value := os.Getenv(key); value != "" {
+			values[key] = value
+		}
+	}
 	if err := envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "proxy", ".env"), values); err != nil {
 		return err
 	}
