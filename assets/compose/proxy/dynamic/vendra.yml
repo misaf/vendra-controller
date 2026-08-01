@@ -1,12 +1,12 @@
 http:
   routers:
     api:
-      rule: "Host(`api.{{ env \"BASE_DOMAIN\" }}`)"
+      rule: 'Host(`api.{{ env "BASE_DOMAIN" }}`)'
       entryPoints: [websecure]
       service: vendra-api@docker
       tls: {}
     panels:
-      rule: "Host(`admin.{{ env \"BASE_DOMAIN\" }}`) || HostRegexp(`[a-z0-9-]+.admin.{{ env \"BASE_DOMAIN\" }}`) || Host(`console.{{ env \"BASE_DOMAIN\" }}`) || Host(`reseller.{{ env \"BASE_DOMAIN\" }}`)"
+      rule: 'Host(`admin.{{ env "BASE_DOMAIN" }}`) || HostRegexp(`[a-z0-9-]+.admin.{{ env "BASE_DOMAIN" }}`) || Host(`console.{{ env "BASE_DOMAIN" }}`) || Host(`reseller.{{ env "BASE_DOMAIN" }}`)'
       entryPoints: [websecure]
       service: vendra-panels@docker
       tls: {}
