@@ -114,7 +114,7 @@ images:
   platform: ghcr.io/your-org/vendra@sha256:PLATFORM_DIGEST
   website: ghcr.io/your-org/vendra-website@sha256:WEBSITE_DIGEST
   storefront: ghcr.io/your-org/vendra-storefront@sha256:STOREFRONT_DIGEST
-  provisioner: ghcr.io/your-org/vendra-controller-provisioner@sha256:PROVISIONER_DIGEST
+  provisioner: ghcr.io/your-org/vendra-controller@sha256:PROVISIONER_DIGEST
 ```
 
 Replace every example value. Production image references should be immutable

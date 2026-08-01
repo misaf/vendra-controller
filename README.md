@@ -34,10 +34,10 @@ building from a source checkout. The release artifact must match the host's
 operating system and CPU architecture. Verify the installed binary with
 `vendra version` before initializing the stack.
 
-Pushing a semantic-version tag builds and publishes the provisioner container
-as `ghcr.io/<owner>/vendra-controller-provisioner`. The workflow publishes the
-full version, major/minor, and `latest` tags. This image package is separate
-from the host `vendra` CLI binary.
+Pushing a semantic-version tag such as `v1.0.0` builds and publishes the
+provisioner container as `ghcr.io/<owner>/vendra-controller`. The workflow
+publishes the full version, major/minor, and `latest` tags. This image package
+is separate from the host `vendra` CLI binary.
 
 If the shell reports `command not found: vendra`, either invoke the development
 binary as `./bin/vendra` or install it into a directory included in `PATH`.

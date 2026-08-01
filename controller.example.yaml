@@ -11,4 +11,4 @@ images:
   # Default for CLI property commands that do not pass --image. Each property
   # can use a different digest-pinned image.
   storefront: ghcr.io/misaf/vendra-storefront-florist@sha256:REPLACE
-  provisioner: ghcr.io/misaf/vendra-controller-provisioner@sha256:REPLACE
+  provisioner: ghcr.io/misaf/vendra-controller@sha256:REPLACE
