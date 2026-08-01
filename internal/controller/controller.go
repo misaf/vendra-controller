@@ -68,8 +68,15 @@ func (c *Controller) RenderStack() error {
 		return err
 	}
 	platform := map[string]string{}
-	for _, key := range []string{"APP_KEY", "DB_DATABASE", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD", "REDIS_PASSWORD", "MAIL_MAILER", "MAIL_HOST", "MAIL_PORT", "STOREFRONT_PROVISIONER_TOKEN"} {
+	defaults := map[string]string{
+		"CONSOLE_OPERATOR_USERNAME": "vendra",
+		"CONSOLE_OPERATOR_EMAIL":    "vendra@localhost",
+		"CONSOLE_OPERATOR_PASSWORD": "vendra",
+	}
+	for _, key := range []string{"APP_KEY", "DB_DATABASE", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD", "REDIS_PASSWORD", "MAIL_MAILER", "MAIL_HOST", "MAIL_PORT", "STOREFRONT_PROVISIONER_TOKEN", "CONSOLE_OPERATOR_USERNAME", "CONSOLE_OPERATOR_EMAIL", "CONSOLE_OPERATOR_PASSWORD"} {
 		if value := os.Getenv(key); value != "" {
+			platform[key] = value
+		} else if value, ok := defaults[key]; ok {
 			platform[key] = value
 		}
 	}
@@ -79,8 +86,11 @@ func (c *Controller) RenderStack() error {
 	platform["STOREFRONT_IMAGE"] = c.Config.Images.Storefront
 	platform["VENDRA_BASE_DOMAIN"] = c.Config.BaseDomain
 	platform["APP_URL"] = "https://" + c.Config.BaseDomain
+	platform["DB_CONNECTION"] = "mysql"
 	platform["DB_HOST"] = "mysql"
 	platform["REDIS_HOST"] = "redis"
+	platform["CACHE_STORE"] = "redis"
+	platform["QUEUE_CONNECTION"] = "redis"
 	return envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "platform", "platform.env"), platform)
 }
 func (c *Controller) project(name string) compose.Project {
