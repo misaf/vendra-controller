@@ -1,5 +1,11 @@
 # Vendra Controller
 
+> **Ecosystem documentation:** <https://misaf.github.io/vendra-ecosystem-docs>
+>
+> Installation, CLI reference, configuration, the provisioner contract, and the
+> security model are documented there. This README covers building and working
+> on the controller itself. Files under `docs/` are pointers to the same site.
+
 `vendra-controller` is Vendra's Go infrastructure control plane. It ships two
 binaries built from the same internal packages:
 

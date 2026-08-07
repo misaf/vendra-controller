@@ -1,7 +1,6 @@
 # Recovery
 
-Restore database and controller secrets/ACME data, install the matching signed
-`vendra` binary, and run `vendra stack up`. Runtime property directories are
-disposable. In Laravel, run `php artisan storefront:reconcile --sync` inside the
-platform container to replay the authoritative database fleet through API v1.
+**This runbook now lives in the ecosystem documentation:**
 
+- Backups, recovery steps, and reconciliation — <https://misaf.github.io/vendra-ecosystem-docs/controller/security>
+- Operations runbook — <https://misaf.github.io/vendra-ecosystem-docs/operations>

@@ -1,10 +1,10 @@
-# Security Model
+# Security model
 
-Only the provisioner container receives the write-capable Docker socket. Laravel
-web, API, Horizon, scheduler, and monitoring containers never receive it.
-Traefik uses a separate endpoint-restricted read-only socket proxy.
+**This document now lives in the ecosystem documentation:**
+<https://misaf.github.io/vendra-ecosystem-docs/controller/security>
 
-Provisioner v1 routes use constant-time bearer authentication. Tokens are read
-from environment-only secret configuration and structured logs never include
-request payloads, tokens, or generated environment values.
+It covers the Docker socket boundary, published ports and SSH tunnels, the two
+header middlewares, why HSTS depends on `certificate_mode`, and what to back up.
 
+The middleware definitions themselves are in
+`assets/compose/proxy/dynamic/middlewares.yml`.
