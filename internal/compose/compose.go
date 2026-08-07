@@ -11,6 +11,15 @@ type Project struct {
 	Docker             docker.Service
 	Dir, Name, EnvFile string
 	Files              []string
+	// NoPull skips the explicit `compose pull`, which fails outright on an image
+	// that exists only in the local daemon.
+	//
+	// It deliberately does NOT pass `--pull never` to `up`: the stack's public
+	// dependencies (mysql, redis, traefik) are legitimately fetched from a
+	// registry, and forbidding that breaks a first run on a clean machine. Only
+	// the images you build locally are meant to bypass the registry, and `up`
+	// already uses those when they are present under the configured name.
+	NoPull bool
 }
 
 func (p Project) run(ctx context.Context, stdin io.Reader, args ...string) error {

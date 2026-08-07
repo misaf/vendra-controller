@@ -51,7 +51,8 @@ binary as `./bin/vendra` or install it into a directory included in `PATH`.
 ## Start here
 
 For a complete installation—from a new host to the first storefront—follow
-[Getting started](docs/getting-started.md). The abbreviated command sequence
+[Getting started](docs/getting-started.md). To run the stack from locally built
+images with no registry, see [Local development](docs/local-development.md). The abbreviated command sequence
 below assumes Docker, the CLI, DNS, configuration, secrets, and registry access
 are already prepared.
 

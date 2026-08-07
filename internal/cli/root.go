@@ -24,7 +24,7 @@ import (
 
 type options struct {
 	configPath, stateDir, logFormat string
-	verbose, noColor                bool
+	verbose, noColor, noPull        bool
 }
 type application struct {
 	options        *options
@@ -49,6 +49,7 @@ func NewWith(version string, runner process.Runner, stdin io.Reader, stdout, std
 	root.PersistentFlags().StringVar(&o.logFormat, "log-format", "text", "text or json logs")
 	root.PersistentFlags().BoolVarP(&o.verbose, "verbose", "v", false, "enable verbose logs")
 	root.PersistentFlags().BoolVar(&o.noColor, "no-color", false, "disable color output")
+	root.PersistentFlags().BoolVar(&o.noPull, "no-pull", false, "use images already in the local Docker daemon instead of pulling")
 	root.AddCommand(app.initCommand(), app.stackCommand(), app.propertyCommand(), &cobra.Command{Use: "version", RunE: func(cmd *cobra.Command, _ []string) error { fmt.Fprintln(cmd.OutOrStdout(), version); return nil }})
 	root.AddCommand(completionCommand(root))
 	return root
@@ -62,7 +63,10 @@ func (a *application) load() (*controller.Controller, error) {
 		cfg.StateDir = a.options.stateDir
 	}
 	service := docker.Service{Runner: a.runner}
-	return controller.New(cfg, service), nil
+	c := controller.New(cfg, service)
+	c.NoPull = a.options.noPull
+	c.Properties.NoPull = a.options.noPull
+	return c, nil
 }
 func (a *application) initCommand() *cobra.Command {
 	return &cobra.Command{Use: "init", Short: "Initialize controller state", RunE: func(cmd *cobra.Command, _ []string) error {

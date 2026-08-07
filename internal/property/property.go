@@ -26,6 +26,9 @@ type Manager struct {
 	Config   config.Config
 	Docker   docker.Service
 	Renderer renderer.Renderer
+	// NoPull skips `docker compose pull` so a locally built storefront image can
+	// be started without a registry. See Controller.NoPull.
+	NoPull bool
 }
 
 func Validate(spec Spec) error {
@@ -89,8 +92,10 @@ func (m Manager) Up(ctx context.Context, slug string) error {
 	if err != nil {
 		return err
 	}
-	if err = p.Pull(ctx, "web"); err != nil {
-		return err
+	if !m.NoPull {
+		if err = p.Pull(ctx, "web"); err != nil {
+			return err
+		}
 	}
 	return p.Up(ctx, true)
 }
@@ -129,7 +134,7 @@ func (m Manager) Project(slug string) (compose.Project, error) {
 	if _, err := os.Stat(filepath.Join(dir, "docker-compose.yml")); err != nil {
 		return compose.Project{}, fmt.Errorf("property %s is not rendered", slug)
 	}
-	return compose.Project{Docker: m.Docker, Dir: dir, Name: slug, EnvFile: filepath.Join(dir, ".env"), Files: []string{filepath.Join(dir, "docker-compose.yml")}}, nil
+	return compose.Project{Docker: m.Docker, Dir: dir, Name: slug, EnvFile: filepath.Join(dir, ".env"), Files: []string{filepath.Join(dir, "docker-compose.yml")}, NoPull: m.NoPull}, nil
 }
 func resolver(cfg config.Config) string {
 	if cfg.CertificateMode == "acme" {

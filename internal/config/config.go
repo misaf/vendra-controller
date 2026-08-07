@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,6 +30,15 @@ type Config struct {
 	ACMEEmail        string        `yaml:"acme_email"`
 	Images           Images        `yaml:"images"`
 	ProvisionerToken string        `yaml:"-"`
+	// NoPull uses images already in the local Docker daemon instead of pulling
+	// them. `compose pull` fails outright on an image that exists only locally,
+	// so without this a locally built storefront can be rendered but never
+	// started — which the provisioner surfaces only as a failed deployment.
+	//
+	// The CLI's --no-pull flag sets the same behaviour per invocation; the
+	// provisioner is a long-running server with no flags, so config is its only
+	// channel.
+	NoPull bool `yaml:"no_pull"`
 }
 
 func Defaults() Config {
@@ -66,6 +76,9 @@ func Load(path string) (Config, error) {
 	override(&cfg.Images.Storefront, "VENDRA_STOREFRONT_IMAGE")
 	override(&cfg.Images.Provisioner, "VENDRA_PROVISIONER_IMAGE")
 	cfg.ProvisionerToken = os.Getenv("VENDRA_PROVISIONER_TOKEN")
+	if err := overrideBool(&cfg.NoPull, "VENDRA_NO_PULL"); err != nil {
+		return Config{}, err
+	}
 	if cfg.HealthTimeoutRaw != "" {
 		d, err := time.ParseDuration(cfg.HealthTimeoutRaw)
 		if err != nil {
@@ -100,6 +113,22 @@ func override(target *string, key string) {
 	if value := os.Getenv(key); value != "" {
 		*target = value
 	}
+}
+
+// overrideBool rejects an unparseable value rather than treating it as false: a
+// typo in VENDRA_NO_PULL would otherwise silently restore pulling, and the only
+// symptom is a deployment that fails on an image the daemon already has.
+func overrideBool(target *bool, key string) error {
+	value := os.Getenv(key)
+	if value == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("%s: %w", key, err)
+	}
+	*target = parsed
+	return nil
 }
 
 func (c Config) Validate() error {

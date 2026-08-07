@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/misaf/vendra-controller/internal/certificates"
@@ -22,15 +23,33 @@ import (
 )
 
 type Controller struct {
-	Config     config.Config
-	Docker     docker.Service
-	Renderer   renderer.Renderer
+	Config   config.Config
+	Docker   docker.Service
+	Renderer renderer.Renderer
+	// NoPull skips `docker compose pull`, so images that exist only in the local
+	// daemon are used as-is. Compose pull fails outright on an image that is not
+	// in a registry, which would otherwise make running the stack from locally
+	// built sources impossible.
+	NoPull     bool
 	Properties property.Manager
+}
+
+// stackProjects are the stack's Compose projects, in start order.
+//
+// The website is optional: with no image configured there is nothing to run, and
+// requiring one would block anyone whose checkout does not include it. Its
+// absence also leaves the apex host free.
+func (c *Controller) stackProjects() []string {
+	projects := []string{"proxy", "platform"}
+	if strings.TrimSpace(c.Config.Images.Website) != "" {
+		projects = append(projects, "website")
+	}
+	return projects
 }
 
 func New(cfg config.Config, service docker.Service) *Controller {
 	r := renderer.Renderer{}
-	return &Controller{Config: cfg, Docker: service, Renderer: r, Properties: property.Manager{Config: cfg, Docker: service, Renderer: r}}
+	return &Controller{Config: cfg, Docker: service, Renderer: r, NoPull: cfg.NoPull, Properties: property.Manager{Config: cfg, Docker: service, Renderer: r, NoPull: cfg.NoPull}}
 }
 func (c *Controller) Init() error {
 	for _, dir := range []string{c.Config.RuntimeDir(), c.Config.PropertiesDir(), c.Config.CertificatesDir(), filepath.Join(c.Config.StateDir, "acme")} {
@@ -47,7 +66,7 @@ func (c *Controller) Init() error {
 	return c.RenderStack()
 }
 func (c *Controller) RenderStack() error {
-	for _, name := range []string{"proxy", "platform", "website"} {
+	for _, name := range c.stackProjects() {
 		if err := c.Renderer.Project(name, filepath.Join(c.Config.RuntimeDir(), name)); err != nil {
 			return err
 		}
@@ -61,8 +80,10 @@ func (c *Controller) RenderStack() error {
 	if err := envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "proxy", ".env"), values); err != nil {
 		return err
 	}
-	if err := envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "website", ".env"), values); err != nil {
-		return err
+	if strings.TrimSpace(c.Config.Images.Website) != "" {
+		if err := envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "website", ".env"), values); err != nil {
+			return err
+		}
 	}
 	if err := envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "platform", ".env"), values); err != nil {
 		return err
@@ -91,11 +112,16 @@ func (c *Controller) RenderStack() error {
 	platform["REDIS_HOST"] = "redis"
 	platform["CACHE_STORE"] = "redis"
 	platform["QUEUE_CONNECTION"] = "redis"
+	// The provisioner runs as a container in this stack and reads platform.env,
+	// so no_pull has to travel through here. Without it the server always pulls
+	// the storefront image, and a locally built one is rejected by the registry —
+	// the deployment fails with nothing but "provisioning failed" in the console.
+	platform["VENDRA_NO_PULL"] = strconv.FormatBool(c.Config.NoPull)
 	return envfile.Upsert(filepath.Join(c.Config.RuntimeDir(), "platform", "platform.env"), platform)
 }
 func (c *Controller) project(name string) compose.Project {
 	dir := filepath.Join(c.Config.RuntimeDir(), name)
-	return compose.Project{Docker: c.Docker, Dir: dir, Name: name, EnvFile: filepath.Join(dir, ".env"), Files: []string{filepath.Join(dir, "docker-compose.yml")}}
+	return compose.Project{Docker: c.Docker, Dir: dir, Name: name, EnvFile: filepath.Join(dir, ".env"), Files: []string{filepath.Join(dir, "docker-compose.yml")}, NoPull: c.NoPull}
 }
 func (c *Controller) Up(ctx context.Context) error {
 	if err := c.Docker.Available(ctx); err != nil {
@@ -112,13 +138,15 @@ func (c *Controller) Up(ctx context.Context) error {
 			return err
 		}
 	}
-	for _, name := range []string{"proxy", "platform", "website"} {
+	for _, name := range c.stackProjects() {
 		p := c.project(name)
 		if err := p.Validate(ctx); err != nil {
 			return err
 		}
-		if err := p.Pull(ctx); err != nil {
-			return err
+		if !c.NoPull {
+			if err := p.Pull(ctx); err != nil {
+				return err
+			}
 		}
 		if err := p.Up(ctx, true); err != nil {
 			return err
@@ -130,8 +158,9 @@ func (c *Controller) Down(ctx context.Context) error {
 	for _, slug := range c.PropertySlugs() {
 		_ = c.Properties.Down(ctx, slug)
 	}
-	for _, name := range []string{"website", "platform", "proxy"} {
-		_ = c.project(name).Down(ctx)
+	projects := c.stackProjects()
+	for i := len(projects) - 1; i >= 0; i-- {
+		_ = c.project(projects[i]).Down(ctx)
 	}
 	return nil
 }
@@ -142,7 +171,7 @@ func (c *Controller) Restart(ctx context.Context) error {
 	return c.Up(ctx)
 }
 func (c *Controller) PS(ctx context.Context) error {
-	for _, name := range []string{"proxy", "platform", "website"} {
+	for _, name := range c.stackProjects() {
 		fmt.Printf("%s:\n", name)
 		if err := c.project(name).PS(ctx); err != nil {
 			return err
