@@ -5,12 +5,37 @@ services:
     restart: unless-stopped
     security_opt: ["no-new-privileges:true"]
     expose: ["${STOREFRONT_PORT:-3000}"]
+    volumes:
+      - "${VENDRA_STATE_DIR:-/var/lib/vendra}/certificates:/certs:ro"
     environment:
       NODE_ENV: production
       STOREFRONT_CONFIG_BASE64: "${STOREFRONT_CONFIG_BASE64:?required}"
       VENDRA_API_URL: "https://api.${BASE_DOMAIN}"
+      # Under certificate_mode: self-signed the API is served with a certificate
+      # no public root signs, and Node rejects it with
+      # DEPTH_ZERO_SELF_SIGNED_CERT — every server-side fetch fails while the
+      # page still renders, so it shows only as empty sections. Empty in acme
+      # mode, where the system roots already cover it.
+      NODE_EXTRA_CA_CERTS: "${STOREFRONT_CA_FILE:-}"
+      # Tenant credential for the canonical API. Server-side only — the image
+      # never exposes it to the browser. Inert until the backend validates it.
+      VENDRA_STOREFRONT_KEY: "${VENDRA_STOREFRONT_KEY:-}"
+      # Optional. Unset, the API origin is used; it serves /storage.
+      STORAGE_BASE_URL: "${STORAGE_BASE_URL:-}"
+      # Optional. Unset, the property configuration's siteUrl applies. Set only
+      # when a deployment serves the property on another domain (staging).
+      SITE_URL: "${STOREFRONT_SITE_URL:-}"
+      # Server-side reverse geocoding. Unset, checkout falls back to Nominatim.
+      NESHAN_SERVICE_KEY: "${NESHAN_SERVICE_KEY:-}"
+      # Per-environment contact overrides. Unset, the configuration applies.
+      CONTACT_MOBILE_PHONE: "${CONTACT_MOBILE_PHONE:-}"
+      CONTACT_OFFICE_PHONE: "${CONTACT_OFFICE_PHONE:-}"
+      CONTACT_EMAIL: "${CONTACT_EMAIL:-}"
+      CONTACT_HOURS_OPEN: "${CONTACT_HOURS_OPEN:-}"
+      CONTACT_HOURS_CLOSE: "${CONTACT_HOURS_CLOSE:-}"
+      CONTACT_MAP_QUERY: "${CONTACT_MAP_QUERY:-}"
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${STOREFRONT_PORT:-3000}${STOREFRONT_HEALTH_PATH:-/}').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:${STOREFRONT_PORT:-3000}${STOREFRONT_HEALTH_PATH:-/api/health}').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 12
@@ -23,6 +48,11 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
       - "traefik.http.services.${ROUTER_NAME}.loadbalancer.server.port=${STOREFRONT_PORT:-3000}"
+      # Without this Traefik keeps routing to a container Docker already knows is
+      # unhealthy, so a bad deploy 502s instead of draining.
+      - "traefik.http.services.${ROUTER_NAME}.loadbalancer.healthcheck.path=${STOREFRONT_HEALTH_PATH:-/api/health}"
+      - "traefik.http.services.${ROUTER_NAME}.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.${ROUTER_NAME}.loadbalancer.healthcheck.timeout=3s"
       - "traefik.http.routers.${ROUTER_NAME}.rule=Host(`${DOMAIN}`) || Host(`www.${DOMAIN}`)"
       - "traefik.http.routers.${ROUTER_NAME}.entrypoints=websecure"
       - "traefik.http.routers.${ROUTER_NAME}.tls=true"

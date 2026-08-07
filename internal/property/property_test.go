@@ -46,6 +46,23 @@ func TestValidateRejectsMismatchedIdentity(t *testing.T) {
 		t.Fatal("expected identity validation error")
 	}
 }
+
+func TestRenderWritesTheImageHealthPath(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.StateDir = t.TempDir()
+	manager := Manager{Config: cfg, Renderer: renderer.Renderer{}}
+	spec := validSpec()
+	if err := manager.Render(context.Background(), spec); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(manager.Dir(spec.Slug), ".env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "STOREFRONT_HEALTH_PATH=" + DefaultHealthPath; !stringContains(string(data), want) {
+		t.Fatalf("expected %q in rendered env, got: %s", want, data)
+	}
+}
 func contains(value, part string) bool { return len(value) >= len(part) && stringContains(value, part) }
 func stringContains(value, part string) bool {
 	for i := 0; i+len(part) <= len(value); i++ {

@@ -11,12 +11,18 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/misaf/vendra-controller/internal/certificates"
 	"github.com/misaf/vendra-controller/internal/compose"
 	"github.com/misaf/vendra-controller/internal/config"
 	"github.com/misaf/vendra-controller/internal/docker"
 	"github.com/misaf/vendra-controller/internal/envfile"
 	"github.com/misaf/vendra-controller/internal/renderer"
 )
+
+// DefaultHealthPath is the storefront image's dedicated health endpoint. It
+// reports the server process only, so a check against it cannot be satisfied by
+// an unrelated page rendering — which is what "/" would allow.
+const DefaultHealthPath = "/api/health"
 
 var slugPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 var domainPattern = regexp.MustCompile(`^(?i:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)$`)
@@ -82,7 +88,7 @@ func (m Manager) Render(_ context.Context, spec Spec) error {
 	if err := m.Renderer.Project("property", dir); err != nil {
 		return err
 	}
-	return envfile.Upsert(filepath.Join(dir, ".env"), map[string]string{"DOMAIN": spec.Domain, "ROUTER_NAME": spec.Slug, "BASE_DOMAIN": m.Config.BaseDomain, "STOREFRONT_IMAGE": spec.Image, "STOREFRONT_CONFIG_BASE64": spec.ConfigurationBase64, "STOREFRONT_THEME": spec.Theme, "STOREFRONT_PORT": "3000", "STOREFRONT_HEALTH_PATH": "/", "CERT_RESOLVER": resolver(m.Config)})
+	return envfile.Upsert(filepath.Join(dir, ".env"), map[string]string{"DOMAIN": spec.Domain, "ROUTER_NAME": spec.Slug, "BASE_DOMAIN": m.Config.BaseDomain, "STOREFRONT_IMAGE": spec.Image, "STOREFRONT_CONFIG_BASE64": spec.ConfigurationBase64, "STOREFRONT_PORT": "3000", "STOREFRONT_HEALTH_PATH": DefaultHealthPath, "CERT_RESOLVER": resolver(m.Config), "VENDRA_STATE_DIR": m.Config.StateDir, "STOREFRONT_CA_FILE": certificateAuthority(m.Config)})
 }
 func (m Manager) Up(ctx context.Context, slug string) error {
 	if err := m.Docker.EnsureNetwork(ctx, m.Config.Network); err != nil {
@@ -136,6 +142,21 @@ func (m Manager) Project(slug string) (compose.Project, error) {
 	}
 	return compose.Project{Docker: m.Docker, Dir: dir, Name: slug, EnvFile: filepath.Join(dir, ".env"), Files: []string{filepath.Join(dir, "docker-compose.yml")}, NoPull: m.NoPull}, nil
 }
+
+// certificateAuthority is the in-container path the storefront's Node runtime
+// trusts, or empty when the system roots suffice.
+//
+// It is the same certificate Traefik serves, mounted read-only: under
+// certificate_mode: self-signed nothing public signs it, so without this every
+// server-side call the storefront makes to the API is rejected before it is
+// sent.
+func certificateAuthority(cfg config.Config) string {
+	if cfg.CertificateMode == "self-signed" {
+		return "/certs/" + certificates.CAFileName
+	}
+	return ""
+}
+
 func resolver(cfg config.Config) string {
 	if cfg.CertificateMode == "acme" {
 		return "letsencrypt"
