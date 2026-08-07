@@ -57,6 +57,8 @@ services:
       - "traefik.http.routers.${ROUTER_NAME}.entrypoints=websecure"
       - "traefik.http.routers.${ROUTER_NAME}.tls=true"
       - "traefik.http.routers.${ROUTER_NAME}.tls.certresolver=${CERT_RESOLVER:-}"
+      # Customer-domain variant: no HSTS subdomain inclusion, since we do not
+      # serve the rest of the customer's DNS.
+      - "traefik.http.routers.${ROUTER_NAME}.middlewares=www-redirect@file,security-headers@file,compression@file"
 networks:
   traefik-public: {external: true}
-

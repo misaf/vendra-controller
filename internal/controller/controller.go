@@ -65,14 +65,33 @@ func (c *Controller) Init() error {
 	}
 	return c.RenderStack()
 }
+
+// hstsSeconds is the max-age the security-headers middlewares advertise.
+//
+// Zero under self-signed certificates, which disables HSTS. Sending it with a
+// certificate the browser does not trust pins the host to HTTPS *and* removes
+// the "proceed anyway" bypass, leaving a local .test host unreachable until the
+// operator clears HSTS state by hand. One year once ACME issues real ones.
+func hstsSeconds(cfg config.Config) string {
+	if cfg.CertificateMode == "acme" {
+		return "31536000"
+	}
+	return "0"
+}
+
 func (c *Controller) RenderStack() error {
 	for _, name := range c.stackProjects() {
 		if err := c.Renderer.Project(name, filepath.Join(c.Config.RuntimeDir(), name)); err != nil {
 			return err
 		}
 	}
-	values := map[string]string{"BASE_DOMAIN": c.Config.BaseDomain, "VENDRA_STATE_DIR": c.Config.StateDir, "VENDRA_PLATFORM_IMAGE": c.Config.Images.Platform, "VENDRA_WEBSITE_IMAGE": c.Config.Images.Website, "VENDRA_PROVISIONER_IMAGE": c.Config.Images.Provisioner, "ACME_EMAIL": c.Config.ACMEEmail}
-	for _, key := range []string{"DB_DATABASE", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD"} {
+	values := map[string]string{"BASE_DOMAIN": c.Config.BaseDomain, "VENDRA_STATE_DIR": c.Config.StateDir, "VENDRA_PLATFORM_IMAGE": c.Config.Images.Platform, "VENDRA_WEBSITE_IMAGE": c.Config.Images.Website, "VENDRA_PROVISIONER_IMAGE": c.Config.Images.Provisioner, "ACME_EMAIL": c.Config.ACMEEmail, "TRAEFIK_HSTS_SECONDS": hstsSeconds(c.Config)}
+	// The *_BIND_ADDRESS / *_PORT pairs reach compose port mappings, not container
+	// environment. Both default to loopback in their templates — MySQL on 3306,
+	// the Traefik dashboard on 8080 — so each is reachable from the host or over
+	// an SSH tunnel and nowhere else. Widen an address only deliberately: it
+	// publishes a database, or an unauthenticated dashboard, on that interface.
+	for _, key := range []string{"DB_DATABASE", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD", "MYSQL_BIND_ADDRESS", "MYSQL_PORT", "TRAEFIK_DASHBOARD_BIND_ADDRESS", "TRAEFIK_DASHBOARD_PORT", "TRAEFIK_HSTS_SECONDS"} {
 		if value := os.Getenv(key); value != "" {
 			values[key] = value
 		}

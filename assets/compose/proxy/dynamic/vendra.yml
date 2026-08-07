@@ -4,11 +4,13 @@ http:
       rule: 'Host(`api.{{ env "BASE_DOMAIN" }}`)'
       entryPoints: [websecure]
       service: vendra-api@docker
+      middlewares: [security-headers-platform@file, rate-limit-api@file, compression@file]
       tls: {}
     panels:
       rule: 'Host(`admin.{{ env "BASE_DOMAIN" }}`) || HostRegexp(`[a-z0-9-]+.admin.{{ env "BASE_DOMAIN" }}`) || Host(`console.{{ env "BASE_DOMAIN" }}`) || Host(`reseller.{{ env "BASE_DOMAIN" }}`)'
       entryPoints: [websecure]
       service: vendra-panels@docker
+      middlewares: [security-headers-platform@file, rate-limit@file, compression@file]
       tls: {}
 tls:
   stores:
