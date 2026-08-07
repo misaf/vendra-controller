@@ -72,6 +72,28 @@ services:
     networks: [internal]
     labels: []
     healthcheck: {disable: true}
+  # Server metrics (CPU, memory, storage). Without this the Pulse dashboard
+  # renders but its server cards stay empty.
+  pulse:
+    <<: *php
+    depends_on: *after-app
+    command: ["php", "artisan", "pulse:check"]
+    # Stable hostname so stats record under one name across container
+    # replacements instead of fragmenting across random container IDs.
+    hostname: "vendra-app"
+    networks: [internal]
+    labels: []
+    healthcheck: {disable: true}
+  # Drains the Redis ingest buffer into storage. Required whenever
+  # PULSE_INGEST_DRIVER=redis — without it, entries buffer and never land, and
+  # the dashboard goes silently empty.
+  pulse-worker:
+    <<: *php
+    depends_on: *after-app
+    command: ["php", "artisan", "pulse:work"]
+    networks: [internal]
+    labels: []
+    healthcheck: {disable: true}
   provisioner:
     image: "${VENDRA_PROVISIONER_IMAGE:?required}"
     restart: unless-stopped

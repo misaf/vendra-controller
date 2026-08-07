@@ -108,15 +108,8 @@ func (c *Controller) RenderStack() error {
 		return err
 	}
 	platform := map[string]string{}
-	defaults := map[string]string{
-		"CONSOLE_OPERATOR_USERNAME": "vendra",
-		"CONSOLE_OPERATOR_EMAIL":    "vendra@localhost",
-		"CONSOLE_OPERATOR_PASSWORD": "vendra",
-	}
 	for _, key := range []string{"APP_KEY", "DB_DATABASE", "DB_USERNAME", "DB_PASSWORD", "DB_ROOT_PASSWORD", "REDIS_PASSWORD", "MAIL_MAILER", "MAIL_HOST", "MAIL_PORT", "STOREFRONT_PROVISIONER_TOKEN", "CONSOLE_OPERATOR_USERNAME", "CONSOLE_OPERATOR_EMAIL", "CONSOLE_OPERATOR_PASSWORD"} {
 		if value := os.Getenv(key); value != "" {
-			platform[key] = value
-		} else if value, ok := defaults[key]; ok {
 			platform[key] = value
 		}
 	}
@@ -126,11 +119,21 @@ func (c *Controller) RenderStack() error {
 	platform["STOREFRONT_IMAGE"] = c.Config.Images.Storefront
 	platform["VENDRA_BASE_DOMAIN"] = c.Config.BaseDomain
 	platform["APP_URL"] = "https://" + c.Config.BaseDomain
+	// config/app.php reads this straight from the environment and the platform
+	// resolves it with Config::string(), which rejects null. Left unset, any code
+	// path that builds an asset URL — creating a property, for one — fails with
+	// "app.asset_url must be a string, NULL given".
+	platform["ASSET_URL"] = "https://" + c.Config.BaseDomain
 	platform["DB_CONNECTION"] = "mysql"
 	platform["DB_HOST"] = "mysql"
 	platform["REDIS_HOST"] = "redis"
 	platform["CACHE_STORE"] = "redis"
 	platform["QUEUE_CONNECTION"] = "redis"
+	// Buffer Pulse entries in Redis rather than writing them during the request.
+	// Only safe because the platform stack runs `pulse:work` to drain the buffer —
+	// set this without that service and the dashboard silently stops filling.
+	platform["PULSE_INGEST_DRIVER"] = "redis"
+	platform["PULSE_REDIS_CONNECTION"] = "cache"
 	// The provisioner runs as a container in this stack and reads platform.env,
 	// so no_pull has to travel through here. Without it the server always pulls
 	// the storefront image, and a locally built one is rejected by the registry —
