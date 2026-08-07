@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/misaf/vendra-controller/internal/config"
 	"github.com/misaf/vendra-controller/internal/controller"
@@ -198,7 +199,72 @@ func (a *application) propertyCommand() *cobra.Command {
 	}}
 	remove.Flags().BoolVar(&yes, "yes", false, "skip confirmation")
 	root.AddCommand(remove)
+	root.AddCommand(a.propertyList(), a.propertySync())
 	return root
+}
+
+// propertyList reports drift in both directions: registered but not rendered on
+// this host, and rendered but absent from the registry — the second matters
+// because a restore driven by the registry would silently skip it.
+func (a *application) propertyList() *cobra.Command {
+	return &cobra.Command{Use: "ls", Short: "List the fleet and any registry drift", RunE: func(cmd *cobra.Command, _ []string) error {
+		c, err := a.load()
+		if err != nil {
+			return err
+		}
+		fleet, err := c.Properties.Fleet()
+		if err != nil {
+			return err
+		}
+		out := cmd.OutOrStdout()
+		if len(fleet) == 0 {
+			fmt.Fprintln(out, "no properties")
+			return nil
+		}
+		writer := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+		fmt.Fprintln(writer, "SLUG\tDOMAIN\tSTATE\tIMAGE")
+		for _, entry := range fleet {
+			state := "ok"
+			switch {
+			case entry.Registry && !entry.Rendered:
+				state = "not rendered"
+			case !entry.Registry && entry.Rendered:
+				state = "unregistered"
+			}
+			domain, image := entry.Domain, entry.Image
+			if domain == "" {
+				domain = "-"
+			}
+			if image == "" {
+				image = "-"
+			}
+			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\n", entry.Slug, domain, state, image)
+		}
+		return writer.Flush()
+	}}
+}
+
+func (a *application) propertySync() *cobra.Command {
+	return &cobra.Command{Use: "sync", Short: "Re-render every registered property", RunE: func(cmd *cobra.Command, _ []string) error {
+		c, err := a.load()
+		if err != nil {
+			return err
+		}
+		unresolved, err := c.Properties.Sync(cmd.Context())
+		if err != nil {
+			return err
+		}
+		out := cmd.OutOrStdout()
+		if len(unresolved) == 0 {
+			fmt.Fprintln(out, "synced")
+			return nil
+		}
+		// Not an error: the registry holds no configuration by design, so these
+		// have to come back through Vendra rather than from this host.
+		fmt.Fprintf(out, "synced, except %s — no stored configuration.\n", strings.Join(unresolved, ", "))
+		fmt.Fprintln(out, "Re-provision them from Vendra, or re-run `property render` with --configuration.")
+		return nil
+	}}
 }
 func (a *application) propertyWrite(name string, idempotent bool) *cobra.Command {
 	var image, theme, configuration, encoded string

@@ -20,7 +20,11 @@ func (s Service) Available(ctx context.Context) error {
 	return nil
 }
 func (s Service) EnsureNetwork(ctx context.Context, name string) error {
-	if err := s.run(ctx, "network", "inspect", name); err == nil {
+	// The probe is expected to fail the first time, so its output is discarded:
+	// otherwise every fresh start prints "network traefik-public not found",
+	// which reads as a failure immediately before the network is created.
+	probe := process.Request{Name: "docker", Args: []string{"network", "inspect", name}, Stdout: io.Discard, Stderr: io.Discard}
+	if err := s.Runner.Run(ctx, probe); err == nil {
 		return nil
 	}
 	return s.run(ctx, "network", "create", name)
