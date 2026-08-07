@@ -51,8 +51,15 @@ func Defaults() Config {
 func Load(path string) (Config, error) {
 	cfg := Defaults()
 	loadEnvironmentFile("/etc/vendra/controller.env")
+
+	// A path the caller asked for must exist. Only the implicit default may be
+	// absent: silently falling back to Defaults() when someone passed --config
+	// hands them a stack with no images and the wrong state_dir, and the first
+	// symptom is an unrelated Compose interpolation error several steps later.
+	explicit := path != ""
 	if path == "" {
 		path = os.Getenv("VENDRA_CONFIG")
+		explicit = path != ""
 	}
 	if path == "" {
 		path = "/etc/vendra/controller.yaml"
@@ -61,6 +68,8 @@ func Load(path string) (Config, error) {
 		if err := yaml.Unmarshal(data, &cfg); err != nil {
 			return Config{}, fmt.Errorf("decode config %s: %w", path, err)
 		}
+	} else if explicit && errors.Is(err, os.ErrNotExist) {
+		return Config{}, fmt.Errorf("config %s does not exist", path)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return Config{}, fmt.Errorf("read config %s: %w", path, err)
 	}
